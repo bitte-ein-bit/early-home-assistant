@@ -20,6 +20,9 @@ STEP_USER_SCHEMA = vol.Schema(
     {vol.Required(CONF_API_KEY): str, vol.Required(CONF_API_SECRET): str}
 )
 
+# hassfest rejects literal URLs in strings.json, so it is filled in here.
+DESCRIPTION_PLACEHOLDERS = {"url": "https://product.early.app"}
+
 
 class EarlyConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle the setup of an EARLY account."""
@@ -61,7 +64,10 @@ class EarlyConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
 
         return self.async_show_form(
-            step_id="user", data_schema=STEP_USER_SCHEMA, errors=errors
+            step_id="user",
+            data_schema=STEP_USER_SCHEMA,
+            errors=errors,
+            description_placeholders=DESCRIPTION_PLACEHOLDERS,
         )
 
     async def async_step_reauth(
@@ -94,5 +100,8 @@ class EarlyConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
 
         return self.async_show_form(
-            step_id="reauth_confirm", data_schema=STEP_USER_SCHEMA, errors=errors
+            step_id="reauth_confirm",
+            data_schema=STEP_USER_SCHEMA,
+            errors=errors,
+            description_placeholders=DESCRIPTION_PLACEHOLDERS,
         )

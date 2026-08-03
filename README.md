@@ -134,6 +134,14 @@ automation:
 - Polling is used rather than EARLY's webhooks, which would require a publicly
   reachable HTTPS URL.
 
+## Branding
+
+`custom_components/early/brand/` holds a generic stopwatch icon so HACS has brand
+assets to show. It is a placeholder, not EARLY's logo. Replacing it with the
+official artwork — or getting the integration listed in
+[home-assistant/brands](https://github.com/home-assistant/brands) — needs EARLY's
+own assets and permission to use them.
+
 ## License
 
 MIT
