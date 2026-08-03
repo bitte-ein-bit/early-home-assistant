@@ -33,6 +33,14 @@ class EarlyNotFoundError(EarlyError):
     """Raised when EARLY has nothing to return for the requested resource."""
 
 
+class EarlyConflictError(EarlyError):
+    """Raised when a request clashes with the current tracking state.
+
+    Stopping while nothing runs is the case that shows up in practice; EARLY
+    answers it with a 409 and "there is no tracking in progress".
+    """
+
+
 def api_timestamp(value: datetime) -> str:
     """Format a datetime the way EARLY expects it.
 
@@ -127,6 +135,9 @@ class EarlyApi:
 
         if response.status == 404:
             raise EarlyNotFoundError(await self._async_error_message(response))
+
+        if response.status == 409:
+            raise EarlyConflictError(await self._async_error_message(response))
 
         if response.status >= 400:
             message = await self._async_error_message(response)

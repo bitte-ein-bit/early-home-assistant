@@ -7,10 +7,9 @@ from typing import TYPE_CHECKING
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall, callback
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 
-from .api import EarlyError
 from .const import (
     ATTR_ACTIVITY,
     ATTR_NOTE,
@@ -19,6 +18,7 @@ from .const import (
     SERVICE_START_TRACKING,
     SERVICE_STOP_TRACKING,
 )
+from .errors import translated_errors
 
 if TYPE_CHECKING:
     from . import EarlyConfigEntry
@@ -87,44 +87,26 @@ async def _async_start_tracking(call: ServiceCall) -> None:
     entry = _async_get_entry(call.hass, call)
     activity_id = _resolve_activity(entry, call.data[ATTR_ACTIVITY])
     coordinator = entry.runtime_data.coordinator
-    try:
+    with translated_errors("start_failed"):
         await coordinator.api.async_start_tracking(
             activity_id, note=call.data.get(ATTR_NOTE)
         )
-    except EarlyError as err:
-        raise HomeAssistantError(
-            translation_domain=DOMAIN,
-            translation_key="start_failed",
-            translation_placeholders={"error": str(err)},
-        ) from err
     await coordinator.async_refresh_now()
 
 
 async def _async_stop_tracking(call: ServiceCall) -> None:
     """Handle the stop_tracking service."""
     coordinator = _async_get_entry(call.hass, call).runtime_data.coordinator
-    try:
+    with translated_errors("stop_failed", conflict_key="not_tracking"):
         await coordinator.api.async_stop_tracking()
-    except EarlyError as err:
-        raise HomeAssistantError(
-            translation_domain=DOMAIN,
-            translation_key="stop_failed",
-            translation_placeholders={"error": str(err)},
-        ) from err
     await coordinator.async_refresh_now(totals=True)
 
 
 async def _async_cancel_tracking(call: ServiceCall) -> None:
     """Handle the cancel_tracking service."""
     coordinator = _async_get_entry(call.hass, call).runtime_data.coordinator
-    try:
+    with translated_errors("cancel_failed", conflict_key="not_tracking"):
         await coordinator.api.async_cancel_tracking()
-    except EarlyError as err:
-        raise HomeAssistantError(
-            translation_domain=DOMAIN,
-            translation_key="cancel_failed",
-            translation_placeholders={"error": str(err)},
-        ) from err
     await coordinator.async_refresh_now(totals=True)
 
 

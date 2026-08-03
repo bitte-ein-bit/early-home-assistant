@@ -230,6 +230,52 @@ async def test_stopping_leaves_the_entities_available(
     assert hass.states.get("sensor.me_example_com_current_activity").state == "unknown"
 
 
+async def test_stopping_while_idle_says_so(
+    hass: HomeAssistant, entry: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """EARLY answers a pointless stop with 409 "no tracking in progress"."""
+    from homeassistant.exceptions import HomeAssistantError
+
+    aioclient_mock.clear_requests()
+    aioclient_mock.post(
+        f"{API_BASE_URL}/tracking/stop",
+        status=409,
+        json={"message": "there is no tracking in progress"},
+    )
+
+    with pytest.raises(HomeAssistantError) as caught:
+        await hass.services.async_call(DOMAIN, "stop_tracking", {}, blocking=True)
+
+    assert caught.value.translation_key == "not_tracking"
+    # A pointless press must not take the integration down.
+    assert entry.state is ConfigEntryState.LOADED
+    assert (
+        hass.states.get("binary_sensor.me_example_com_tracking").state != "unavailable"
+    )
+
+
+async def test_a_conflict_elsewhere_relays_earlys_wording(
+    hass: HomeAssistant, entry: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """409 means something else per endpoint, so start keeps EARLY's text."""
+    from homeassistant.exceptions import HomeAssistantError
+
+    aioclient_mock.clear_requests()
+    aioclient_mock.post(
+        re.compile(rf"{re.escape(API_BASE_URL)}/tracking/\d+/start"),
+        status=409,
+        json={"message": "a tracking is already in progress"},
+    )
+
+    with pytest.raises(HomeAssistantError) as caught:
+        await hass.services.async_call(
+            DOMAIN, "start_tracking", {"activity": "Admin"}, blocking=True
+        )
+
+    assert caught.value.translation_key == "start_failed"
+    assert "already in progress" in caught.value.translation_placeholders["error"]
+
+
 async def test_back_to_back_actions_each_refresh(
     hass: HomeAssistant, entry: MockConfigEntry, mock_early: AiohttpClientMocker
 ) -> None:

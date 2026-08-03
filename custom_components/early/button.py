@@ -8,10 +8,10 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import EarlyConfigEntry
-from .api import EarlyError
 from .const import DOMAIN
 from .coordinator import EarlyDataUpdateCoordinator
 from .entity import EarlyEntity
+from .errors import translated_errors
 
 
 async def async_setup_entry(
@@ -48,14 +48,8 @@ class EarlyStartButton(EarlyEntity, ButtonEntity):
             raise HomeAssistantError(
                 translation_domain=DOMAIN, translation_key="no_activity_selected"
             )
-        try:
+        with translated_errors("start_failed"):
             await self.coordinator.api.async_start_tracking(activity_id)
-        except EarlyError as err:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="start_failed",
-                translation_placeholders={"error": str(err)},
-            ) from err
         await self.coordinator.async_refresh_now()
 
 
@@ -72,14 +66,8 @@ class EarlyStopButton(EarlyEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Stop tracking."""
-        try:
+        with translated_errors("stop_failed", conflict_key="not_tracking"):
             await self.coordinator.api.async_stop_tracking()
-        except EarlyError as err:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="stop_failed",
-                translation_placeholders={"error": str(err)},
-            ) from err
         await self.coordinator.async_refresh_now(totals=True)
 
 
@@ -97,12 +85,6 @@ class EarlyCancelButton(EarlyEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Throw the running tracking away."""
-        try:
+        with translated_errors("cancel_failed", conflict_key="not_tracking"):
             await self.coordinator.api.async_cancel_tracking()
-        except EarlyError as err:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="cancel_failed",
-                translation_placeholders={"error": str(err)},
-            ) from err
         await self.coordinator.async_refresh_now(totals=True)

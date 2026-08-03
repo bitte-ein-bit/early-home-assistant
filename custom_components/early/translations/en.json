@@ -76,6 +76,9 @@
     "no_activity_selected": {
       "message": "No activity is selected. Pick one in the EARLY activity select first."
     },
+    "not_tracking": {
+      "message": "Nothing is being tracked right now."
+    },
     "start_failed": {
       "message": "Could not start tracking: {error}"
     },
