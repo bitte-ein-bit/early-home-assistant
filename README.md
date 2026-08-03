@@ -88,6 +88,8 @@ Assistant starts a reauth flow instead of silently going unavailable.
   crosses midnight only counts its part of each day.
 - EARLY returns timestamps without a zone suffix; they are treated as UTC and
   bucketed in your Home Assistant time zone.
+- While nothing is being tracked, EARLY answers `GET /tracking` with a 404 rather
+  than an empty body. That is read as "idle", not as an error.
 
 ## Example automation
 

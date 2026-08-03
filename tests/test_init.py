@@ -192,6 +192,45 @@ async def test_stop_tracking_service(
     assert any("/tracking/stop" in str(call[1]) for call in mock_early.mock_calls)
 
 
+async def test_idle_tracking_is_not_an_error(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, freezer
+) -> None:
+    """EARLY answers /tracking with a 404 while nothing is being tracked."""
+    freezer.move_to(NOW)
+    await hass.config.async_set_time_zone("UTC")
+
+    aioclient_mock.post(f"{API_BASE_URL}/developer/sign-in", json={"token": "abc"})
+    aioclient_mock.get(
+        f"{API_BASE_URL}/tracking", status=404, json={"message": "no tracking"}
+    )
+    aioclient_mock.get(f"{API_BASE_URL}/activities", json=ACTIVITIES)
+    aioclient_mock.get(
+        re.compile(rf"{re.escape(API_BASE_URL)}/time-entries/.*"), json=TIME_ENTRIES
+    )
+
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="42",
+        title="me@example.com",
+        data={CONF_API_KEY: "key", CONF_API_SECRET: "secret"},
+    )
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert config_entry.state is ConfigEntryState.LOADED
+    assert hass.states.get("sensor.me_example_com_current_activity").state == "unknown"
+    assert hass.states.get("sensor.me_example_com_current_duration").state == "unknown"
+    assert hass.states.get("binary_sensor.me_example_com_tracking").state == "off"
+    # The completed entry from earlier today still counts.
+    assert hass.states.get("sensor.me_example_com_tracked_today").state == "1.0"
+    # The activity list is independent of whether something is running.
+    assert hass.states.get("select.me_example_com_activity").attributes["options"] == [
+        "Admin",
+        "Deep Work",
+    ]
+
+
 async def test_unload(hass: HomeAssistant, entry: MockConfigEntry) -> None:
     """The entry unloads cleanly and takes its entities down with it."""
     assert await hass.config_entries.async_unload(entry.entry_id)

@@ -29,6 +29,10 @@ class EarlyConnectionError(EarlyError):
     """Raised when EARLY cannot be reached."""
 
 
+class EarlyNotFoundError(EarlyError):
+    """Raised when EARLY has nothing to return for the requested resource."""
+
+
 def api_timestamp(value: datetime) -> str:
     """Format a datetime the way EARLY expects it.
 
@@ -121,6 +125,9 @@ class EarlyApi:
         if response.status in (401, 403):
             raise EarlyAuthError("EARLY rejected the access token")
 
+        if response.status == 404:
+            raise EarlyNotFoundError(await self._async_error_message(response))
+
         if response.status >= 400:
             message = await self._async_error_message(response)
             raise EarlyError(f"EARLY returned {response.status}: {message}")
@@ -154,7 +161,11 @@ class EarlyApi:
 
     async def async_get_tracking(self) -> dict[str, Any] | None:
         """Return the running tracking, or None when nothing is tracked."""
-        payload = await self._async_request("GET", "/tracking")
+        try:
+            payload = await self._async_request("GET", "/tracking")
+        except EarlyNotFoundError:
+            # Idle is a 404 here, not an empty body. Anything else is an error.
+            return None
         if not payload:
             return None
         # v4 documents the tracking at the root, v3 wrapped it in
