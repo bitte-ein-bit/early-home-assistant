@@ -11,7 +11,7 @@ from homeassistant.util import dt as dt_util
 from custom_components.early.api import api_timestamp, parse_timestamp
 from custom_components.early.coordinator import Activity, bucket_starts, overlap_seconds
 from custom_components.early.select import option_names
-from custom_components.early.sensor import readable_note
+from custom_components.early.sensor import readable_note, rgb_color
 
 
 def utc(*args: int) -> datetime:
@@ -109,3 +109,23 @@ def test_readable_note_without_text() -> None:
     """An empty note has no readable form."""
     assert readable_note(None) is None
     assert readable_note({"text": None}) is None
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("#123456", [18, 52, 86]),
+        ("#000000", [0, 0, 0]),
+        ("#FFFFFF", [255, 255, 255]),
+        # Lower case and a missing hash both turn up in the wild.
+        ("abcdef", [171, 205, 239]),
+        # Nothing usable: the attribute stays absent rather than guessing.
+        (None, None),
+        ("", None),
+        ("#abc", None),
+        ("#gggggg", None),
+    ],
+)
+def test_rgb_color(value: str | None, expected: list[int] | None) -> None:
+    """The hex colour becomes the triplet that light.turn_on expects."""
+    assert rgb_color(value) == expected

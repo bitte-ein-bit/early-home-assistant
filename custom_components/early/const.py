@@ -25,6 +25,7 @@ ATTR_COLOR: Final = "color"
 ATTR_FOLDER_ID: Final = "folder_id"
 ATTR_MENTIONS: Final = "mentions"
 ATTR_NOTE: Final = "note"
+ATTR_RGB_COLOR: Final = "rgb_color"
 ATTR_STARTED_AT: Final = "started_at"
 ATTR_TAGS: Final = "tags"
 

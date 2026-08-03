@@ -19,7 +19,7 @@ without anything being hardcoded.
 
 | Entity | Type | Description |
 | --- | --- | --- |
-| `sensor.<account>_current_activity` | sensor | Name of the activity being tracked, `unknown` while idle. Attributes: `activity_id`, `color`, `folder_id`, `started_at`, `note`, `tags`, `mentions` |
+| `sensor.<account>_current_activity` | sensor | Name of the activity being tracked, `unknown` while idle. Attributes: `activity_id`, `color`, `rgb_color`, `folder_id`, `started_at`, `note`, `tags`, `mentions` |
 | `sensor.<account>_tracking_started` | sensor (timestamp) | When the running tracking started |
 | `sensor.<account>_current_duration` | sensor (duration, min) | Minutes since the running tracking started |
 | `sensor.<account>_tracked_today` | sensor (duration, h) | Tracked hours since local midnight, including the running tracking |
@@ -107,6 +107,39 @@ automation:
         target:
           entity_id: light.desk
 ```
+
+Tint a WLED strip in the colour of the activity you are tracking, and turn it
+off when you stop. The activity colour is published both as the raw `color` hex
+string and, ready for `light.turn_on`, as an `rgb_color` triplet:
+
+```yaml
+automation:
+  - alias: Desk strip follows the tracked activity
+    triggers:
+      - trigger: state
+        entity_id: sensor.early_current_activity
+    actions:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: >-
+                  {{ state_attr('sensor.early_current_activity', 'rgb_color')
+                     is not none }}
+            sequence:
+              - action: light.turn_on
+                target:
+                  entity_id: light.wled_desk
+                data:
+                  rgb_color: >-
+                    {{ state_attr('sensor.early_current_activity', 'rgb_color') }}
+        default:
+          - action: light.turn_off
+            target:
+              entity_id: light.wled_desk
+```
+
+`rgb_color` is `None` while nothing is tracked and whenever the activity has no
+usable colour, which is what the `choose` above keys off.
 
 Stop tracking when you leave home:
 

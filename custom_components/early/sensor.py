@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -26,11 +27,14 @@ from .const import (
     ATTR_FOLDER_ID,
     ATTR_MENTIONS,
     ATTR_NOTE,
+    ATTR_RGB_COLOR,
     ATTR_STARTED_AT,
     ATTR_TAGS,
 )
 from .coordinator import EarlyData, EarlyDataUpdateCoordinator, bucket_starts
 from .entity import EarlyEntity
+
+_LOGGER = logging.getLogger(__name__)
 
 # EARLY stores tags and mentions inside the note text as <{{|t|<id>|}}> and
 # <{{|m|<id>|}}> markers, which are meaningless outside of their app.
@@ -57,6 +61,25 @@ def readable_note(note: dict[str, Any] | None) -> str | None:
         return labels.get((match.group(1), match.group(2)), "")
 
     return _MARKER.sub(replace, text).strip() or None
+
+
+def rgb_color(value: str | None) -> list[int] | None:
+    """Convert EARLY's "#rrggbb" activity colour into an RGB triplet.
+
+    Home Assistant has no hex-to-RGB template filter, and light.turn_on wants
+    a triplet, so the conversion happens here rather than in everyone's
+    automation.
+    """
+    if not value:
+        return None
+    text = value.removeprefix("#")
+    if len(text) != 6:
+        return None
+    try:
+        return [int(text[index : index + 2], 16) for index in (0, 2, 4)]
+    except ValueError:
+        _LOGGER.debug("Unparseable activity colour from EARLY: %s", value)
+        return None
 
 
 def _labels(note: dict[str, Any] | None, key: str) -> list[str]:
@@ -148,6 +171,7 @@ class EarlyCurrentActivitySensor(EarlyEntity, SensorEntity):
         return {
             ATTR_ACTIVITY_ID: data.tracked_activity_id,
             ATTR_COLOR: activity.get("color"),
+            ATTR_RGB_COLOR: rgb_color(activity.get("color")),
             ATTR_FOLDER_ID: activity.get("folderId"),
             ATTR_STARTED_AT: data.started_at,
             ATTR_NOTE: readable_note(note),

@@ -99,6 +99,8 @@ async def test_entities_reflect_the_running_tracking(
     assert current is not None
     assert current.state == "Deep Work"
     assert current.attributes["activity_id"] == "10"
+    assert current.attributes["color"] == "#123456"
+    assert current.attributes["rgb_color"] == [18, 52, 86]
     assert current.attributes["note"] == "quarterly report #focus"
     assert current.attributes["tags"] == ["focus"]
 
