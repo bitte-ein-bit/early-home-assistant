@@ -97,7 +97,7 @@ async def _async_start_tracking(call: ServiceCall) -> None:
             translation_key="start_failed",
             translation_placeholders={"error": str(err)},
         ) from err
-    await coordinator.async_request_refresh()
+    await coordinator.async_refresh_now()
 
 
 async def _async_stop_tracking(call: ServiceCall) -> None:
@@ -111,7 +111,7 @@ async def _async_stop_tracking(call: ServiceCall) -> None:
             translation_key="stop_failed",
             translation_placeholders={"error": str(err)},
         ) from err
-    await coordinator.async_refresh_totals()
+    await coordinator.async_refresh_now(totals=True)
 
 
 async def _async_cancel_tracking(call: ServiceCall) -> None:
@@ -125,7 +125,7 @@ async def _async_cancel_tracking(call: ServiceCall) -> None:
             translation_key="cancel_failed",
             translation_placeholders={"error": str(err)},
         ) from err
-    await coordinator.async_request_refresh()
+    await coordinator.async_refresh_now(totals=True)
 
 
 @callback

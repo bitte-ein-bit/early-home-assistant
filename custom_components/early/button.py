@@ -56,7 +56,7 @@ class EarlyStartButton(EarlyEntity, ButtonEntity):
                 translation_key="start_failed",
                 translation_placeholders={"error": str(err)},
             ) from err
-        await self.coordinator.async_request_refresh()
+        await self.coordinator.async_refresh_now()
 
 
 class EarlyStopButton(EarlyEntity, ButtonEntity):
@@ -80,7 +80,7 @@ class EarlyStopButton(EarlyEntity, ButtonEntity):
                 translation_key="stop_failed",
                 translation_placeholders={"error": str(err)},
             ) from err
-        await self.coordinator.async_refresh_totals()
+        await self.coordinator.async_refresh_now(totals=True)
 
 
 class EarlyCancelButton(EarlyEntity, ButtonEntity):
@@ -105,4 +105,4 @@ class EarlyCancelButton(EarlyEntity, ButtonEntity):
                 translation_key="cancel_failed",
                 translation_placeholders={"error": str(err)},
             ) from err
-        await self.coordinator.async_request_refresh()
+        await self.coordinator.async_refresh_now(totals=True)

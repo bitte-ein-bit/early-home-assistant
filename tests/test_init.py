@@ -230,6 +230,38 @@ async def test_stopping_leaves_the_entities_available(
     assert hass.states.get("sensor.me_example_com_current_activity").state == "unknown"
 
 
+async def test_back_to_back_actions_each_refresh(
+    hass: HomeAssistant, entry: MockConfigEntry, mock_early: AiohttpClientMocker
+) -> None:
+    """A second action must not wait out a debounce cooldown.
+
+    Time is frozen here, so a debounced refresh would never run at all.
+    """
+
+    def tracking_polls() -> int:
+        return len(
+            [
+                call
+                for call in mock_early.mock_calls
+                # session.request() records "GET", session.get() records "get".
+                if call[0].lower() == "get" and str(call[1]).endswith("/tracking")
+            ]
+        )
+
+    before = tracking_polls()
+
+    await hass.services.async_call(DOMAIN, "stop_tracking", {}, blocking=True)
+    await hass.async_block_till_done()
+    after_stop = tracking_polls()
+    assert after_stop > before, "stop did not refresh"
+
+    await hass.services.async_call(
+        DOMAIN, "start_tracking", {"activity": "Admin"}, blocking=True
+    )
+    await hass.async_block_till_done()
+    assert tracking_polls() > after_stop, "the second action was debounced away"
+
+
 async def test_idle_tracking_is_not_an_error(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, freezer
 ) -> None:

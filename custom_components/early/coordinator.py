@@ -111,10 +111,17 @@ class EarlyDataUpdateCoordinator(DataUpdateCoordinator[EarlyData]):
         self._entries_day: int | None = None
         self._last_tracked_id: str | None = None
 
-    async def async_refresh_totals(self) -> None:
-        """Force the daily totals to be recomputed on the next refresh."""
-        self._entries_fetched = None
-        await self.async_request_refresh()
+    async def async_refresh_now(self, *, totals: bool = False) -> None:
+        """Refresh straight away after an action the user triggered.
+
+        async_request_refresh is debounced with a 10 second cooldown, so a
+        second action shortly after the first would not show up until that
+        cooldown expired. Pass totals=True when a time entry was created or
+        removed.
+        """
+        if totals:
+            self._entries_fetched = None
+        await self.async_refresh()
 
     async def _async_update_data(self) -> EarlyData:
         """Fetch the current state from EARLY."""
