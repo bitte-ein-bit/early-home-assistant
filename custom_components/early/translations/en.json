@@ -1,0 +1,109 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to EARLY",
+        "description": "Create an API key and secret at https://product.early.app under Settings → API.",
+        "data": {
+          "api_key": "API key",
+          "api_secret": "API secret"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reconnect to EARLY",
+        "description": "The stored API key and secret were rejected. Enter a valid pair.",
+        "data": {
+          "api_key": "API key",
+          "api_secret": "API secret"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to EARLY.",
+      "invalid_auth": "EARLY rejected this API key and secret.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This EARLY account is already set up.",
+      "reauth_successful": "EARLY was reconnected successfully.",
+      "wrong_account": "These credentials belong to a different EARLY account."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "tracking": { "name": "Tracking" }
+    },
+    "button": {
+      "start": { "name": "Start tracking" },
+      "stop": { "name": "Stop tracking" },
+      "cancel": { "name": "Discard tracking" }
+    },
+    "select": {
+      "activity": { "name": "Activity" }
+    },
+    "sensor": {
+      "current_activity": { "name": "Current activity" },
+      "started_at": { "name": "Tracking started" },
+      "current_duration": { "name": "Current duration" },
+      "tracked_today": { "name": "Tracked today" },
+      "tracked_week": { "name": "Tracked this week" },
+      "tracked_month": { "name": "Tracked this month" }
+    }
+  },
+  "exceptions": {
+    "no_activity_selected": {
+      "message": "No activity is selected. Pick one in the EARLY activity select first."
+    },
+    "start_failed": { "message": "Could not start tracking: {error}" },
+    "stop_failed": { "message": "Could not stop tracking: {error}" },
+    "cancel_failed": { "message": "Could not discard the tracking: {error}" },
+    "entry_not_found": { "message": "No loaded EARLY account with id {entry_id}." },
+    "entry_required": {
+      "message": "Several EARLY accounts are set up. Pass config_entry_id to say which one to use."
+    },
+    "no_entries": { "message": "No EARLY account is set up." },
+    "unknown_activity": {
+      "message": "EARLY has no activity called '{activity}'. Known activities: {known}"
+    }
+  },
+  "services": {
+    "start_tracking": {
+      "name": "Start tracking",
+      "description": "Starts tracking an EARLY activity.",
+      "fields": {
+        "activity": {
+          "name": "Activity",
+          "description": "Name or id of the activity to track. Names are matched case-insensitively."
+        },
+        "note": {
+          "name": "Note",
+          "description": "Optional note stored with the tracking."
+        },
+        "config_entry_id": {
+          "name": "EARLY account",
+          "description": "Only needed when more than one EARLY account is set up."
+        }
+      }
+    },
+    "stop_tracking": {
+      "name": "Stop tracking",
+      "description": "Stops the running tracking and keeps it as a time entry.",
+      "fields": {
+        "config_entry_id": {
+          "name": "EARLY account",
+          "description": "Only needed when more than one EARLY account is set up."
+        }
+      }
+    },
+    "cancel_tracking": {
+      "name": "Discard tracking",
+      "description": "Discards the running tracking without creating a time entry.",
+      "fields": {
+        "config_entry_id": {
+          "name": "EARLY account",
+          "description": "Only needed when more than one EARLY account is set up."
+        }
+      }
+    }
+  }
+}

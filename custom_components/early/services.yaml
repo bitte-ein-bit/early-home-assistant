@@ -1,0 +1,33 @@
+start_tracking:
+  fields:
+    activity:
+      required: true
+      example: Deep Work
+      selector:
+        text:
+    note:
+      required: false
+      example: Reviewing the quarterly report
+      selector:
+        text:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: early
+
+stop_tracking:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: early
+
+cancel_tracking:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: early

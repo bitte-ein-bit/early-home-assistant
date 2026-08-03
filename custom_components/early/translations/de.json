@@ -1,0 +1,109 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit EARLY verbinden",
+        "description": "API-Key und Secret erzeugst du auf https://product.early.app unter Einstellungen → API.",
+        "data": {
+          "api_key": "API-Key",
+          "api_secret": "API-Secret"
+        }
+      },
+      "reauth_confirm": {
+        "title": "EARLY neu verbinden",
+        "description": "Der hinterlegte API-Key wurde abgelehnt. Bitte ein gültiges Paar eintragen.",
+        "data": {
+          "api_key": "API-Key",
+          "api_secret": "API-Secret"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zu EARLY fehlgeschlagen.",
+      "invalid_auth": "EARLY hat diesen API-Key samt Secret abgelehnt.",
+      "unknown": "Unerwarteter Fehler."
+    },
+    "abort": {
+      "already_configured": "Dieses EARLY-Konto ist bereits eingerichtet.",
+      "reauth_successful": "EARLY wurde neu verbunden.",
+      "wrong_account": "Diese Zugangsdaten gehören zu einem anderen EARLY-Konto."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "tracking": { "name": "Tracking" }
+    },
+    "button": {
+      "start": { "name": "Tracking starten" },
+      "stop": { "name": "Tracking stoppen" },
+      "cancel": { "name": "Tracking verwerfen" }
+    },
+    "select": {
+      "activity": { "name": "Aktivität" }
+    },
+    "sensor": {
+      "current_activity": { "name": "Aktuelle Aktivität" },
+      "started_at": { "name": "Tracking gestartet" },
+      "current_duration": { "name": "Aktuelle Dauer" },
+      "tracked_today": { "name": "Heute erfasst" },
+      "tracked_week": { "name": "Diese Woche erfasst" },
+      "tracked_month": { "name": "Diesen Monat erfasst" }
+    }
+  },
+  "exceptions": {
+    "no_activity_selected": {
+      "message": "Es ist keine Aktivität ausgewählt. Wähle zuerst eine im EARLY-Aktivitätsselect."
+    },
+    "start_failed": { "message": "Tracking konnte nicht gestartet werden: {error}" },
+    "stop_failed": { "message": "Tracking konnte nicht gestoppt werden: {error}" },
+    "cancel_failed": { "message": "Tracking konnte nicht verworfen werden: {error}" },
+    "entry_not_found": { "message": "Kein geladenes EARLY-Konto mit der ID {entry_id}." },
+    "entry_required": {
+      "message": "Es sind mehrere EARLY-Konten eingerichtet. Gib config_entry_id an."
+    },
+    "no_entries": { "message": "Es ist kein EARLY-Konto eingerichtet." },
+    "unknown_activity": {
+      "message": "EARLY kennt keine Aktivität '{activity}'. Bekannt sind: {known}"
+    }
+  },
+  "services": {
+    "start_tracking": {
+      "name": "Tracking starten",
+      "description": "Startet das Tracking einer EARLY-Aktivität.",
+      "fields": {
+        "activity": {
+          "name": "Aktivität",
+          "description": "Name oder ID der Aktivität. Namen werden ohne Rücksicht auf Groß-/Kleinschreibung verglichen."
+        },
+        "note": {
+          "name": "Notiz",
+          "description": "Optionale Notiz, die am Tracking gespeichert wird."
+        },
+        "config_entry_id": {
+          "name": "EARLY-Konto",
+          "description": "Nur nötig, wenn mehr als ein EARLY-Konto eingerichtet ist."
+        }
+      }
+    },
+    "stop_tracking": {
+      "name": "Tracking stoppen",
+      "description": "Stoppt das laufende Tracking und legt es als Zeiteintrag ab.",
+      "fields": {
+        "config_entry_id": {
+          "name": "EARLY-Konto",
+          "description": "Nur nötig, wenn mehr als ein EARLY-Konto eingerichtet ist."
+        }
+      }
+    },
+    "cancel_tracking": {
+      "name": "Tracking verwerfen",
+      "description": "Verwirft das laufende Tracking, ohne einen Zeiteintrag anzulegen.",
+      "fields": {
+        "config_entry_id": {
+          "name": "EARLY-Konto",
+          "description": "Nur nötig, wenn mehr als ein EARLY-Konto eingerichtet ist."
+        }
+      }
+    }
+  }
+}
