@@ -192,6 +192,44 @@ async def test_stop_tracking_service(
     assert any("/tracking/stop" in str(call[1]) for call in mock_early.mock_calls)
 
 
+async def test_stopping_leaves_the_entities_available(
+    hass: HomeAssistant, entry: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Stopping puts EARLY into the idle state that answers /tracking with 404.
+
+    The refresh that follows a stop must not take the whole entry down with it.
+    """
+    aioclient_mock.clear_requests()
+    aioclient_mock.post(f"{API_BASE_URL}/developer/sign-in", json={"token": "abc"})
+    aioclient_mock.post(f"{API_BASE_URL}/tracking/stop", json={"id": "99"})
+    aioclient_mock.get(
+        f"{API_BASE_URL}/tracking", status=404, json={"message": "no tracking"}
+    )
+    aioclient_mock.get(f"{API_BASE_URL}/activities", json=ACTIVITIES)
+    aioclient_mock.get(
+        re.compile(rf"{re.escape(API_BASE_URL)}/time-entries/.*"), json=TIME_ENTRIES
+    )
+
+    await hass.services.async_call(
+        "button",
+        "press",
+        {"entity_id": "button.me_example_com_stop_tracking"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    for entity_id in (
+        "sensor.me_example_com_current_activity",
+        "sensor.me_example_com_tracked_today",
+        "binary_sensor.me_example_com_tracking",
+        "select.me_example_com_activity",
+    ):
+        assert hass.states.get(entity_id).state != "unavailable", entity_id
+
+    assert hass.states.get("binary_sensor.me_example_com_tracking").state == "off"
+    assert hass.states.get("sensor.me_example_com_current_activity").state == "unknown"
+
+
 async def test_idle_tracking_is_not_an_error(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, freezer
 ) -> None:
