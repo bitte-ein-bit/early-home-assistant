@@ -29,6 +29,23 @@
       "wrong_account": "Diese Zugangsdaten gehören zu einem anderen EARLY-Konto."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Soll-Arbeitszeit",
+        "description": "Stunden, die du pro Wochentag erfassen willst. EARLY gibt diese Einstellung nicht über die API heraus, deshalb steht sie hier. Die Saldo-Sensoren vergleichen die erfasste Zeit damit und zählen den heutigen Tag mit vollem Soll.",
+        "data": {
+          "monday": "Montag",
+          "tuesday": "Dienstag",
+          "wednesday": "Mittwoch",
+          "thursday": "Donnerstag",
+          "friday": "Freitag",
+          "saturday": "Samstag",
+          "sunday": "Sonntag"
+        }
+      }
+    }
+  },
   "entity": {
     "binary_sensor": {
       "tracking": {
@@ -69,6 +86,15 @@
       },
       "tracked_month": {
         "name": "Diesen Monat erfasst"
+      },
+      "balance_today": {
+        "name": "Saldo heute"
+      },
+      "balance_week": {
+        "name": "Saldo diese Woche"
+      },
+      "balance_month": {
+        "name": "Saldo diesen Monat"
       }
     }
   },

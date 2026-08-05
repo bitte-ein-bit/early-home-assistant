@@ -27,12 +27,16 @@ from .const import (
     ATTR_FOLDER_ID,
     ATTR_MENTIONS,
     ATTR_NOTE,
+    ATTR_REMAINING_HOURS,
     ATTR_RGB_COLOR,
     ATTR_STARTED_AT,
     ATTR_TAGS,
+    ATTR_TARGET_HOURS,
+    ATTR_TRACKED_HOURS,
 )
 from .coordinator import EarlyData, EarlyDataUpdateCoordinator, bucket_starts
 from .entity import EarlyEntity
+from .targets import target_between
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -98,28 +102,23 @@ def _live_seconds(data: EarlyData, window_start: datetime, now: datetime) -> flo
 
 
 @dataclass(frozen=True, kw_only=True)
-class EarlyTotalDescription(SensorEntityDescription):
-    """Describes a tracked-time total over a rolling window."""
+class EarlyWindowDescription(SensorEntityDescription):
+    """Describes one of the rolling windows tracked time is summed over."""
 
     completed: Callable[[EarlyData], float]
-    window_start: Callable[[datetime], datetime]
+    # Index into bucket_starts(): 0 = today, 1 = this week, 2 = this month.
+    bucket: int
 
 
-TOTALS: tuple[EarlyTotalDescription, ...] = (
-    EarlyTotalDescription(
-        key="tracked_today",
-        completed=lambda data: data.completed_today,
-        window_start=lambda now: bucket_starts(now)[0],
+WINDOWS: tuple[EarlyWindowDescription, ...] = (
+    EarlyWindowDescription(
+        key="today", bucket=0, completed=lambda data: data.completed_today
     ),
-    EarlyTotalDescription(
-        key="tracked_week",
-        completed=lambda data: data.completed_week,
-        window_start=lambda now: bucket_starts(now)[1],
+    EarlyWindowDescription(
+        key="week", bucket=1, completed=lambda data: data.completed_week
     ),
-    EarlyTotalDescription(
-        key="tracked_month",
-        completed=lambda data: data.completed_month,
-        window_start=lambda now: bucket_starts(now)[2],
+    EarlyWindowDescription(
+        key="month", bucket=2, completed=lambda data: data.completed_month
     ),
 )
 
@@ -136,9 +135,9 @@ async def async_setup_entry(
         EarlyStartedAtSensor(coordinator, entry),
         EarlyCurrentDurationSensor(coordinator, entry),
     ]
-    entities.extend(
-        EarlyTotalSensor(coordinator, entry, description) for description in TOTALS
-    )
+    for description in WINDOWS:
+        entities.append(EarlyTotalSensor(coordinator, entry, description))
+        entities.append(EarlyBalanceSensor(coordinator, entry, description))
     async_add_entities(entities)
 
 
@@ -222,34 +221,105 @@ class EarlyCurrentDurationSensor(EarlyEntity, SensorEntity):
         return int((dt_util.utcnow() - started_at).total_seconds() // 60)
 
 
-class EarlyTotalSensor(EarlyEntity, SensorEntity):
-    """Tracked time over a rolling window, including the running tracking."""
+class EarlyWindowSensor(EarlyEntity, SensorEntity):
+    """Shared arithmetic for the sensors that report on a rolling window."""
 
-    entity_description: EarlyTotalDescription
+    entity_description: EarlyWindowDescription
 
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_native_unit_of_measurement = UnitOfTime.HOURS
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 2
+
+    def __init__(
+        self,
+        coordinator: EarlyDataUpdateCoordinator,
+        entry: EarlyConfigEntry,
+        description: EarlyWindowDescription,
+        key: str,
+    ) -> None:
+        """Initialise the sensor."""
+        super().__init__(coordinator, entry, key)
+        self.entity_description = description
+
+    @property
+    def _window_start(self) -> datetime:
+        """Return the local start of this sensor's window."""
+        return bucket_starts(dt_util.utcnow())[self.entity_description.bucket]
+
+    @property
+    def tracked_hours(self) -> float:
+        """Return completed plus currently running hours in the window."""
+        data = self.coordinator.data
+        now = dt_util.utcnow()
+        seconds = self.entity_description.completed(data) + _live_seconds(
+            data, self._window_start, now
+        )
+        return round(seconds / 3600, 3)
+
+    @property
+    def target_hours(self) -> float:
+        """Return the hours meant to be tracked from the window start to today."""
+        return round(
+            target_between(
+                self._entry.options,
+                self._window_start.date(),
+                dt_util.as_local(dt_util.utcnow()).date(),
+            ),
+            3,
+        )
+
+
+class EarlyTotalSensor(EarlyWindowSensor):
+    """Tracked time over a rolling window, including the running tracking."""
+
     _attr_icon = "mdi:chart-timeline-variant"
 
     def __init__(
         self,
         coordinator: EarlyDataUpdateCoordinator,
         entry: EarlyConfigEntry,
-        description: EarlyTotalDescription,
+        description: EarlyWindowDescription,
     ) -> None:
         """Initialise the sensor."""
-        super().__init__(coordinator, entry, description.key)
-        self.entity_description = description
+        super().__init__(coordinator, entry, description, f"tracked_{description.key}")
 
     @property
     def native_value(self) -> float:
-        """Return completed plus currently running hours in the window."""
-        data = self.coordinator.data
-        now = dt_util.utcnow()
-        window_start = self.entity_description.window_start(now)
-        seconds = self.entity_description.completed(data) + _live_seconds(
-            data, window_start, now
-        )
-        return round(seconds / 3600, 3)
+        """Return the tracked hours."""
+        return self.tracked_hours
+
+
+class EarlyBalanceSensor(EarlyWindowSensor):
+    """Tracked time measured against the configured working-time target.
+
+    Negative means hours still owed, positive means overtime. Today counts
+    with its full target, so the value climbs to zero over the working day.
+    """
+
+    _attr_icon = "mdi:scale-balance"
+
+    def __init__(
+        self,
+        coordinator: EarlyDataUpdateCoordinator,
+        entry: EarlyConfigEntry,
+        description: EarlyWindowDescription,
+    ) -> None:
+        """Initialise the sensor."""
+        super().__init__(coordinator, entry, description, f"balance_{description.key}")
+
+    @property
+    def native_value(self) -> float:
+        """Return tracked minus target hours."""
+        return round(self.tracked_hours - self.target_hours, 3)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the two sides of the comparison and what is left of it."""
+        tracked = self.tracked_hours
+        target = self.target_hours
+        return {
+            ATTR_TRACKED_HOURS: tracked,
+            ATTR_TARGET_HOURS: target,
+            ATTR_REMAINING_HOURS: round(max(target - tracked, 0.0), 3),
+        }

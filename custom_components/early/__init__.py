@@ -48,8 +48,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: EarlyConfigEntry) -> boo
     entry.runtime_data = EarlyRuntimeData(api=api, coordinator=coordinator)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     async_setup_services(hass)
     return True
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: EarlyConfigEntry) -> None:
+    """Reload so the balance sensors pick up a changed working-time target."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: EarlyConfigEntry) -> bool:

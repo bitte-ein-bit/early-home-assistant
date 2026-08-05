@@ -9,6 +9,20 @@ DOMAIN: Final = "early"
 
 CONF_API_SECRET: Final = "api_secret"
 
+# EARLY's public API does not expose the working hours configured in its UI,
+# so the target is kept here. Per weekday, because a single daily figure would
+# put every weekend permanently in the red.
+WEEKDAYS: Final = (
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+)
+DEFAULT_WORKDAY_HOURS: Final = (8.0, 8.0, 8.0, 8.0, 8.0, 0.0, 0.0)
+
 API_BASE_URL: Final = "https://api.early.app/api/v4"
 
 # How often the current tracking is polled. Everything else is derived from it.
@@ -25,8 +39,11 @@ ATTR_COLOR: Final = "color"
 ATTR_FOLDER_ID: Final = "folder_id"
 ATTR_MENTIONS: Final = "mentions"
 ATTR_NOTE: Final = "note"
+ATTR_REMAINING_HOURS: Final = "remaining_hours"
 ATTR_RGB_COLOR: Final = "rgb_color"
 ATTR_STARTED_AT: Final = "started_at"
+ATTR_TARGET_HOURS: Final = "target_hours"
+ATTR_TRACKED_HOURS: Final = "tracked_hours"
 ATTR_TAGS: Final = "tags"
 
 SERVICE_START_TRACKING: Final = "start_tracking"

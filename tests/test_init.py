@@ -8,6 +8,7 @@ import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_API_KEY
 from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
@@ -122,6 +123,71 @@ async def test_totals_include_the_running_tracking(
     assert hass.states.get("sensor.me_example_com_tracked_this_week").state == "1.5"
     # ... but inside the calendar month.
     assert hass.states.get("sensor.me_example_com_tracked_this_month").state == "3.5"
+
+
+async def test_balance_compares_tracked_time_against_the_target(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """Balance is tracked minus target, with today counted in full.
+
+    The fixture freezes a Monday at 10:00 UTC with 1.5 h tracked, and no
+    options are set, so the default 8 h weekday target applies.
+    """
+    balance = hass.states.get("sensor.me_example_com_balance_today")
+    assert balance is not None
+    assert float(balance.state) == pytest.approx(1.5 - 8.0)
+    assert balance.attributes["tracked_hours"] == pytest.approx(1.5)
+    assert balance.attributes["target_hours"] == pytest.approx(8.0)
+    assert balance.attributes["remaining_hours"] == pytest.approx(6.5)
+
+    # Monday is the first day of the week, so the week matches the day.
+    week = hass.states.get("sensor.me_example_com_balance_this_week")
+    assert float(week.state) == pytest.approx(1.5 - 8.0)
+
+    # The month started on Saturday the 1st: two weekend days at zero, then
+    # Monday. The Saturday entry counts towards tracked but not the target.
+    month = hass.states.get("sensor.me_example_com_balance_this_month")
+    assert month.attributes["target_hours"] == pytest.approx(8.0)
+    assert float(month.state) == pytest.approx(3.5 - 8.0)
+
+
+async def test_balance_follows_the_configured_target(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """Changing the working hours reloads the entry and moves the balance."""
+    hass.config_entries.async_update_entry(
+        entry, options={"monday": 1.5, "saturday": 0, "sunday": 0}
+    )
+    await hass.async_block_till_done()
+
+    balance = hass.states.get("sensor.me_example_com_balance_today")
+    # Exactly on target: 1.5 h tracked against a 1.5 h Monday.
+    assert float(balance.state) == pytest.approx(0.0)
+    assert balance.attributes["remaining_hours"] == pytest.approx(0.0)
+
+
+async def test_options_flow_stores_the_hours(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """The working time is editable from the integration's options."""
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "init"
+
+    hours = {
+        "monday": 8,
+        "tuesday": 8,
+        "wednesday": 8,
+        "thursday": 8,
+        "friday": 4,
+        "saturday": 0,
+        "sunday": 0,
+    }
+    result = await hass.config_entries.options.async_configure(result["flow_id"], hours)
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options == hours
 
 
 async def test_select_offers_the_activities_from_early(

@@ -25,6 +25,9 @@ without anything being hardcoded.
 | `sensor.<account>_tracked_today` | sensor (duration, h) | Tracked hours since local midnight, including the running tracking |
 | `sensor.<account>_tracked_this_week` | sensor (duration, h) | Same for the current week (Monday–Sunday) |
 | `sensor.<account>_tracked_this_month` | sensor (duration, h) | Same for the current calendar month |
+| `sensor.<account>_balance_today` | sensor (duration, h) | Tracked minus target hours. Negative means hours still owed, positive means overtime. Attributes: `tracked_hours`, `target_hours`, `remaining_hours` |
+| `sensor.<account>_balance_this_week` | sensor (duration, h) | Same from Monday up to and including today |
+| `sensor.<account>_balance_this_month` | sensor (duration, h) | Same from the 1st up to and including today |
 | `binary_sensor.<account>_tracking` | binary sensor | `on` while any tracking runs |
 | `select.<account>_activity` | select | Which activity the start button will track |
 | `button.<account>_start_tracking` | button | Starts the selected activity |
@@ -77,6 +80,46 @@ directory and restart.
 
 Credentials are stored in the config entry. If EARLY ever rejects them, Home
 Assistant starts a reauth flow instead of silently going unavailable.
+
+### Working time target
+
+EARLY lets you set your working hours in its own UI, but **the public API does
+not expose that setting** — `/me` and `/users` return only id, name and email,
+and nothing in the v4 surface carries a target, capacity or weekly schedule. So
+the target lives in Home Assistant instead:
+
+*Settings → Devices & services → EARLY → Configure*
+
+You get one figure per weekday, defaulting to 8/8/8/8/8/0/0. Per weekday rather
+than a single daily number, because a flat 8 hours applied to every calendar day
+would put every weekend permanently in the red — and it lets you express a four
+day week or a short Friday. Changing it reloads the entry, so the balance
+sensors follow immediately.
+
+#### How the balance is counted
+
+`balance = tracked − target`, over the same window as the matching
+`tracked_*` sensor, and **today always counts with its full target**:
+
+| Situation | `balance_today` |
+| --- | --- |
+| Monday 09:00, nothing tracked yet | `-8` |
+| Monday 13:00, 4 h tracked | `-4` |
+| Monday 17:30, 8 h tracked | `0` — done for the day |
+| Monday 19:00, 9.5 h tracked | `+1.5` — overtime |
+| Sunday, 2 h tracked, target 0 | `+2` |
+
+That makes the number answer "how much until I'm even", and reaching `0` is
+exactly the goal of no deficit and no overtime. `remaining_hours` in the
+attributes is the same thing clamped at zero, if you only want the countdown.
+
+The weekly and monthly balances work the same way over their window, so they
+average out a short day against a long one. A week that ends at `0` on Friday
+evening is a week on target.
+
+**Not accounted for:** holidays, sick days and other leave. EARLY has a leaves
+API, but this integration does not read it, so a day off still counts its full
+target and shows as a deficit.
 
 ## How it works
 

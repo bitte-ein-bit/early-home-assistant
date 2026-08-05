@@ -29,6 +29,23 @@
       "wrong_account": "These credentials belong to a different EARLY account."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Working time target",
+        "description": "Hours you aim to track per weekday. EARLY does not expose this setting through its API, so it is kept here. The balance sensors compare tracked time against it, counting today with its full target.",
+        "data": {
+          "monday": "Monday",
+          "tuesday": "Tuesday",
+          "wednesday": "Wednesday",
+          "thursday": "Thursday",
+          "friday": "Friday",
+          "saturday": "Saturday",
+          "sunday": "Sunday"
+        }
+      }
+    }
+  },
   "entity": {
     "binary_sensor": {
       "tracking": {
@@ -69,6 +86,15 @@
       },
       "tracked_month": {
         "name": "Tracked this month"
+      },
+      "balance_today": {
+        "name": "Balance today"
+      },
+      "balance_week": {
+        "name": "Balance this week"
+      },
+      "balance_month": {
+        "name": "Balance this month"
       }
     }
   },
