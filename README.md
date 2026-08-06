@@ -117,9 +117,26 @@ The weekly and monthly balances work the same way over their window, so they
 average out a short day against a long one. A week that ends at `0` on Friday
 evening is a week on target.
 
-**Not accounted for:** holidays, sick days and other leave. EARLY has a leaves
-API, but this integration does not read it, so a day off still counts its full
-target and shows as a deficit.
+#### Time off
+
+Track it as an activity. Give holidays and sick days an activity of their own in
+EARLY and book the hours against it — the balance then works out on its own,
+because `tracked_*` counts every activity, so those hours cancel that day's
+target:
+
+| Day | Tracked | Target | `balance_today` |
+| --- | --- | --- | --- |
+| Day off, 8 h booked as *Holiday* | 8 | 8 | `0` |
+| Half sick day, 4 h *Sick* + 4 h work | 8 | 8 | `0` |
+| Whole week off, 40 h booked | 40 | 40 | `0` |
+
+The one case that does show a deficit is a day off with **nothing** tracked at
+all. EARLY's own leave feature is a separate thing, is not part of every plan,
+and this integration does not read the leaves API — tracking time off as an
+activity covers the same ground without it.
+
+Note that `tracked_*` then means "tracked", not "worked": a week off reads as 40
+tracked hours. If you want the two separated, open an issue.
 
 ## How it works
 
@@ -207,8 +224,9 @@ automation:
   after starting fails.
 - `cancel_tracking` throws the running tracking away. The button for it is
   disabled by default; enable it in the entity settings if you want it.
-- Only your own trackings are covered. Folders, team members and leaves are not
-  exposed.
+- Only your own trackings are covered. Folders, team members and EARLY's own
+  leave feature are not exposed; see [Time off](#time-off) for how that is
+  handled instead.
 - Polling is used rather than EARLY's webhooks, which would require a publicly
   reachable HTTPS URL.
 
