@@ -32,8 +32,13 @@ DEFAULT_ROLLING_DAYS: Final = 28
 
 API_BASE_URL: Final = "https://api.early.app/api/v4"
 
-# How often the current tracking is polled. Everything else is derived from it.
-DEFAULT_SCAN_INTERVAL: Final = timedelta(seconds=30)
+# How often the current tracking is polled. It is the most frequent call by a
+# wide margin, so it backs off once nothing has changed for a while. Anything
+# done from Home Assistant refreshes immediately either way, so the slower
+# cadence only delays noticing a change made in the EARLY app itself.
+ACTIVE_SCAN_INTERVAL: Final = timedelta(seconds=30)
+IDLE_SCAN_INTERVAL: Final = timedelta(minutes=5)
+IDLE_AFTER: Final = timedelta(hours=2)
 # Completed time entries only change when a tracking stops, which the
 # coordinator already reacts to, so the periodic fetch is just a safety net for
 # edits made elsewhere. It is the heaviest call in the integration -- it returns

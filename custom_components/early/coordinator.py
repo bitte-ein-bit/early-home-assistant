@@ -16,11 +16,13 @@ from homeassistant.util import dt as dt_util
 
 from .api import EarlyApi, EarlyAuthError, EarlyError, parse_timestamp
 from .const import (
+    ACTIVE_SCAN_INTERVAL,
     ACTIVITY_INTERVAL,
     CONF_ROLLING_DAYS,
     DEFAULT_ROLLING_DAYS,
-    DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    IDLE_AFTER,
+    IDLE_SCAN_INTERVAL,
     TIME_ENTRY_INTERVAL,
 )
 
@@ -68,6 +70,17 @@ class EarlyData:
         return str(activity["id"]) if activity.get("id") is not None else None
 
     @property
+    def tracking_signal(self) -> tuple[str | None, str | None]:
+        """Identify the running tracking.
+
+        Carries the tracking id as well as the activity, so stopping and
+        restarting the same activity still reads as a change.
+        """
+        if not self.tracking:
+            return (None, None)
+        return (str(self.tracking.get("id")), self.tracked_activity_id)
+
+    @property
     def started_at(self) -> datetime | None:
         """Return when the running tracking started."""
         if not self.tracking:
@@ -82,6 +95,17 @@ def overlap_seconds(
     first = max(start, window_start)
     last = min(end, window_end)
     return max((last - first).total_seconds(), 0.0)
+
+
+def scan_interval(quiet_for: timedelta) -> timedelta:
+    """Return how often to poll after a given stretch without a change.
+
+    Backing off costs nothing for anything done from Home Assistant, which
+    refreshes on the spot; it only delays noticing a change made in the app.
+    """
+    if quiet_for >= IDLE_AFTER:
+        return IDLE_SCAN_INTERVAL
+    return ACTIVE_SCAN_INTERVAL
 
 
 def rolling_days(options: Mapping[str, Any]) -> int:
@@ -123,13 +147,14 @@ class EarlyDataUpdateCoordinator(DataUpdateCoordinator[EarlyData]):
             _LOGGER,
             name=DOMAIN,
             config_entry=config_entry,
-            update_interval=DEFAULT_SCAN_INTERVAL,
+            update_interval=ACTIVE_SCAN_INTERVAL,
         )
         self.api = api
         self._activities_fetched: datetime | None = None
         self._entries_fetched: datetime | None = None
         self._entries_day: int | None = None
-        self._last_tracked_id: str | None = None
+        self._last_signal: tuple[str | None, str | None] | None = None
+        self._last_change: datetime | None = None
 
     async def async_refresh_now(self, *, totals: bool = False) -> None:
         """Refresh straight away after an action the user triggered.
@@ -168,7 +193,9 @@ class EarlyDataUpdateCoordinator(DataUpdateCoordinator[EarlyData]):
                 completed_rolling=previous.completed_rolling,
             )
 
-            if self._totals_need_refresh(data, now):
+            changed = data.tracking_signal != self._last_signal
+
+            if self._totals_need_refresh(changed, now):
                 await self._async_update_totals(data, now)
                 self._entries_fetched = now
                 self._entries_day = dt_util.as_local(now).toordinal()
@@ -177,15 +204,18 @@ class EarlyDataUpdateCoordinator(DataUpdateCoordinator[EarlyData]):
         except EarlyError as err:
             raise UpdateFailed(str(err)) from err
 
-        self._last_tracked_id = data.tracked_activity_id
+        self._last_signal = data.tracking_signal
+        if changed or self._last_change is None:
+            self._last_change = now
+        self.update_interval = scan_interval(now - self._last_change)
         return data
 
-    def _totals_need_refresh(self, data: EarlyData, now: datetime) -> bool:
+    def _totals_need_refresh(self, changed: bool, now: datetime) -> bool:
         """Decide whether the completed totals have to be fetched again."""
         if self._is_stale(self._entries_fetched, now, TIME_ENTRY_INTERVAL):
             return True
-        # A tracking that just stopped or switched produced a new time entry.
-        if data.tracked_activity_id != self._last_tracked_id:
+        # A tracking that just stopped, started or switched made a time entry.
+        if changed:
             return True
         # Midnight moved the buckets underneath us.
         return self._entries_day != dt_util.as_local(now).toordinal()

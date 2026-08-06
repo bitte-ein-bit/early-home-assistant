@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
 from homeassistant.util import dt as dt_util
 
 from custom_components.early.api import api_timestamp, parse_timestamp
-from custom_components.early.coordinator import Activity, bucket_starts, overlap_seconds
+from custom_components.early.coordinator import (
+    Activity,
+    bucket_starts,
+    overlap_seconds,
+    scan_interval,
+)
 from custom_components.early.select import option_names
 from custom_components.early.sensor import readable_note, rgb_color
 
@@ -131,3 +136,23 @@ def test_readable_note_without_text() -> None:
 def test_rgb_color(value: str | None, expected: list[int] | None) -> None:
     """The hex colour becomes the triplet that light.turn_on expects."""
     assert rgb_color(value) == expected
+
+
+@pytest.mark.parametrize(
+    ("quiet_minutes", "expected_seconds"),
+    [
+        # Something just happened, or happened recently: stay responsive.
+        (0, 30),
+        (60, 30),
+        (119, 30),
+        # Two hours of nothing: back off.
+        (120, 300),
+        (600, 300),
+    ],
+)
+def test_scan_interval_backs_off_when_quiet(
+    quiet_minutes: int, expected_seconds: int
+) -> None:
+    """Polling slows down only after a full stretch without a change."""
+    interval = scan_interval(timedelta(minutes=quiet_minutes))
+    assert interval.total_seconds() == expected_seconds

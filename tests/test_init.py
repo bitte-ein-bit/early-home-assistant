@@ -212,6 +212,75 @@ async def test_rolling_window_length_is_configurable(
     assert "2026-07-21T00:00:00.000" in ranges[-1]
 
 
+async def test_polling_backs_off_while_nothing_changes(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    freezer,
+) -> None:
+    """The tracking poll slows to 5 minutes after two quiet hours, then speeds up."""
+    coordinator = entry.runtime_data.coordinator
+
+    # A tracking is running and has just been seen, so polling stays fast.
+    assert coordinator.update_interval.total_seconds() == 30
+
+    # The same tracking, still running, two hours later.
+    freezer.move_to("2026-08-03T12:01:00+00:00")
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.update_interval.total_seconds() == 300
+
+    # Now it stops. Noticing that is a change, so we go back to watching closely.
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(
+        f"{API_BASE_URL}/tracking", status=404, json={"message": "no tracking"}
+    )
+    aioclient_mock.get(f"{API_BASE_URL}/activities", json=ACTIVITIES)
+    aioclient_mock.get(
+        re.compile(rf"{re.escape(API_BASE_URL)}/time-entries/.*"), json=TIME_ENTRIES
+    )
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.update_interval.total_seconds() == 30
+
+    # Idle counts as quiet too: nothing tracked, nothing changing.
+    freezer.move_to("2026-08-03T14:02:00+00:00")
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.update_interval.total_seconds() == 300
+
+
+async def test_restarting_the_same_activity_counts_as_a_change(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    freezer,
+) -> None:
+    """A new tracking of the same activity is still a change, id included."""
+    coordinator = entry.runtime_data.coordinator
+
+    freezer.move_to("2026-08-03T12:01:00+00:00")
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.update_interval.total_seconds() == 300
+
+    # Same activity, but a different tracking: stopped and started again.
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(f"{API_BASE_URL}/tracking", json={**TRACKING, "id": 2})
+    aioclient_mock.get(f"{API_BASE_URL}/activities", json=ACTIVITIES)
+    aioclient_mock.get(
+        re.compile(rf"{re.escape(API_BASE_URL)}/time-entries/.*"), json=TIME_ENTRIES
+    )
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert coordinator.update_interval.total_seconds() == 30
+    # It also produced a time entry, so the history was refetched.
+    assert any("/time-entries/" in str(c[1]) for c in aioclient_mock.mock_calls)
+
+
 async def test_history_is_not_refetched_on_every_poll(
     hass: HomeAssistant,
     entry: MockConfigEntry,

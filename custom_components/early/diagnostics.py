@@ -19,8 +19,14 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: EarlyConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-    data = entry.runtime_data.coordinator.data
+    coordinator = entry.runtime_data.coordinator
+    data = coordinator.data
     return {
+        "scan_interval_seconds": (
+            coordinator.update_interval.total_seconds()
+            if coordinator.update_interval
+            else None
+        ),
         "entry": async_redact_data(dict(entry.data), TO_REDACT),
         "tracking": async_redact_data(data.tracking or {}, TO_REDACT),
         "activity_count": len(data.activities),

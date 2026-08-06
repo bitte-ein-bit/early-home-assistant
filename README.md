@@ -156,15 +156,25 @@ tracked hours. If you want the two separated, open an issue.
 
 ## How it works
 
-- The running tracking is polled every 30 seconds (`GET /api/v4/tracking`). That
-  single small object is the only thing polled often, and it accounts for about
-  88% of all requests the integration makes — roughly 2900 a day, or 2 a minute.
+- The running tracking (`GET /api/v4/tracking`) is the only thing polled often,
+  and its cadence adapts: **every 30 seconds** normally, dropping to **every 5
+  minutes** once nothing has changed for two hours, and snapping back the moment
+  a tracking starts, stops or switches activity.
+
+  The back-off costs nothing for anything you do from Home Assistant — buttons
+  and services refresh on the spot regardless — so it only delays noticing a
+  change made in the EARLY app itself, and only after a quiet stretch. On a day
+  with four transitions that is about 7 hours at the fast cadence and 17 at the
+  slow one: roughly 1000 requests instead of 2900.
 - Completed time entries (`GET /api/v4/time-entries/{from}/{to}`) are the heavy
   call: one request returns every entry in the window. It is therefore
   event driven rather than polled — it runs on startup, whenever a tracking
   starts, stops or switches activity, at midnight when the buckets move, and
   otherwise at most once an hour as a safety net for edits made elsewhere. That
   is around 30 requests a day instead of the 288 a five minute poll would cost.
+- All told the integration makes roughly **1200 requests a day**, down from 3300
+  before the two changes above. `GET /api/v4/activities` accounts for 96 of them,
+  every 15 minutes, so the select follows edits made in the app.
 - One time entry request feeds all four windows at once: it spans the earliest
   window start, and each entry is then counted against every window it falls in.
   Shortening the rolling window therefore also shortens what has to be fetched.
