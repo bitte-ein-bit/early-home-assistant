@@ -28,8 +28,8 @@ without anything being hardcoded.
 | `sensor.<account>_balance_today` | sensor (duration, h) | Tracked minus target hours. Negative means hours still owed, positive means overtime. Attributes: `tracked_hours`, `target_hours`, `remaining_hours` |
 | `sensor.<account>_balance_this_week` | sensor (duration, h) | Same from Monday up to and including today |
 | `sensor.<account>_balance_this_month` | sensor (duration, h) | Same from the 1st up to and including today |
-| `sensor.<account>_tracked_last_30_days` | sensor (duration, h) | Rolling window: the 30 days ending with today |
-| `sensor.<account>_balance_last_30_days` | sensor (duration, h) | Balance over that same rolling window |
+| `sensor.<account>_tracked_last_28_days` | sensor (duration, h) | Rolling window ending with today; length configurable, and it appears in the name |
+| `sensor.<account>_balance_last_28_days` | sensor (duration, h) | Balance over that same rolling window |
 | `binary_sensor.<account>_tracking` | binary sensor | `on` while any tracking runs |
 | `select.<account>_activity` | select | Which activity the start button will track |
 | `button.<account>_start_tracking` | button | Starts the selected activity |
@@ -119,14 +119,19 @@ The weekly and monthly balances work the same way over their window, so they
 average out a short day against a long one. A week that ends at `0` on Friday
 evening is a week on target.
 
-The **rolling 30 day** pair is the one to watch for staying on target on
+The **rolling window** pair is the one to watch for staying on target on
 average: unlike the calendar month it does not reset on the 1st, so a deficit or
 a pile of overtime stays visible until it is actually worked off.
 
-One caveat on it: 30 days is not a whole number of weeks, so the window holds 21
-or 22 weekdays depending on where it starts, and the target steps by a day's
-worth as it slides. If you would rather have a target that never moves, a 28 day
-window is exactly four weeks — open an issue and it can be made configurable.
+Its length is set under *Configure* and defaults to **28 days**. Four weeks is
+deliberate: a whole number of weeks always contains the same weekdays, so the
+target stays put as the window slides — 20 weekdays, exactly four times a 40
+hour week, whichever day it happens to start on. A 30 day window would hold 21
+or 22 weekdays depending on where it starts, and its target would step by eight
+hours as it moves, which is noise you would have to read past.
+
+Set it to whatever suits you; the length shows up in the sensor name, so a 14
+day window reads as `Tracked last 14 days`.
 
 #### Time off
 
@@ -155,13 +160,14 @@ tracked hours. If you want the two separated, open an issue.
   single small object is the only thing polled often, and it accounts for about
   88% of all requests the integration makes — roughly 2900 a day, or 2 a minute.
 - Completed time entries (`GET /api/v4/time-entries/{from}/{to}`) are the heavy
-  call: one request returns every entry in a 30 day window. It is therefore
+  call: one request returns every entry in the window. It is therefore
   event driven rather than polled — it runs on startup, whenever a tracking
   starts, stops or switches activity, at midnight when the buckets move, and
   otherwise at most once an hour as a safety net for edits made elsewhere. That
   is around 30 requests a day instead of the 288 a five minute poll would cost.
 - One time entry request feeds all four windows at once: it spans the earliest
   window start, and each entry is then counted against every window it falls in.
+  Shortening the rolling window therefore also shortens what has to be fetched.
 - The daily, weekly and monthly totals add the running tracking's elapsed time on
   top of the completed entries, clipped at the window boundary — a tracking that
   crosses midnight only counts its part of each day.

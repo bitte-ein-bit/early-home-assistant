@@ -33,7 +33,7 @@
     "step": {
       "init": {
         "title": "Soll-Arbeitszeit",
-        "description": "Stunden, die du pro Wochentag erfassen willst. EARLY gibt diese Einstellung nicht über die API heraus, deshalb steht sie hier. Die Saldo-Sensoren vergleichen die erfasste Zeit damit und zählen den heutigen Tag mit vollem Soll.",
+        "description": "Stunden, die du pro Wochentag erfassen willst, und die Länge des rollenden Fensters. EARLY gibt die Arbeitszeit nicht über die API heraus, deshalb steht sie hier. Die Saldo-Sensoren vergleichen die erfasste Zeit damit und zählen den heutigen Tag mit vollem Soll. Ein rollendes Fenster aus ganzen Wochen (28 Tage) hält sein Soll konstant, während es wandert.",
         "data": {
           "monday": "Montag",
           "tuesday": "Dienstag",
@@ -41,7 +41,8 @@
           "thursday": "Donnerstag",
           "friday": "Freitag",
           "saturday": "Samstag",
-          "sunday": "Sonntag"
+          "sunday": "Sonntag",
+          "rolling_days": "Rollendes Fenster"
         }
       }
     }
@@ -97,10 +98,10 @@
         "name": "Saldo diesen Monat"
       },
       "tracked_rolling": {
-        "name": "Letzte 30 Tage erfasst"
+        "name": "Letzte {days} Tage erfasst"
       },
       "balance_rolling": {
-        "name": "Saldo letzte 30 Tage"
+        "name": "Saldo letzte {days} Tage"
       }
     }
   },

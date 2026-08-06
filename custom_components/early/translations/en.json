@@ -33,7 +33,7 @@
     "step": {
       "init": {
         "title": "Working time target",
-        "description": "Hours you aim to track per weekday. EARLY does not expose this setting through its API, so it is kept here. The balance sensors compare tracked time against it, counting today with its full target.",
+        "description": "Hours you aim to track per weekday, and the length of the rolling window. EARLY does not expose the working hours through its API, so they are kept here. The balance sensors compare tracked time against them, counting today with its full target. A rolling window of a whole number of weeks (28 days) keeps its target steady as it slides.",
         "data": {
           "monday": "Monday",
           "tuesday": "Tuesday",
@@ -41,7 +41,8 @@
           "thursday": "Thursday",
           "friday": "Friday",
           "saturday": "Saturday",
-          "sunday": "Sunday"
+          "sunday": "Sunday",
+          "rolling_days": "Rolling window"
         }
       }
     }
@@ -97,10 +98,10 @@
         "name": "Balance this month"
       },
       "tracked_rolling": {
-        "name": "Tracked last 30 days"
+        "name": "Tracked last {days} days"
       },
       "balance_rolling": {
-        "name": "Balance last 30 days"
+        "name": "Balance last {days} days"
       }
     }
   },

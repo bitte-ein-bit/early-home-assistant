@@ -64,8 +64,8 @@ def test_bucket_starts_are_local_midnight() -> None:
         assert day.isoformat() == "2026-08-03T00:00:00+02:00"
         assert week == day
         assert month.isoformat() == "2026-08-01T00:00:00+02:00"
-        # 30 days ending with today, so 29 days back.
-        assert rolling.isoformat() == "2026-07-05T00:00:00+02:00"
+        # The default window is 28 days ending with today, so 27 days back.
+        assert rolling.isoformat() == "2026-07-07T00:00:00+02:00"
 
         # 00:30 UTC on the 4th is already 02:30 local on the 4th.
         day, _, _, _ = bucket_starts(utc(2026, 8, 4, 0, 30))

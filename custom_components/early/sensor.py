@@ -34,7 +34,12 @@ from .const import (
     ATTR_TARGET_HOURS,
     ATTR_TRACKED_HOURS,
 )
-from .coordinator import EarlyData, EarlyDataUpdateCoordinator, bucket_starts
+from .coordinator import (
+    EarlyData,
+    EarlyDataUpdateCoordinator,
+    bucket_starts,
+    rolling_days,
+)
 from .entity import EarlyEntity
 from .targets import target_between
 
@@ -106,8 +111,10 @@ class EarlyWindowDescription(SensorEntityDescription):
     """Describes one of the rolling windows tracked time is summed over."""
 
     completed: Callable[[EarlyData], float]
-    # Index into bucket_starts(): 0 = today, 1 = this week, 2 = this month.
+    # Index into bucket_starts(): 0 = today, 1 = week, 2 = month, 3 = rolling.
     bucket: int
+    # The rolling window's length is configurable, so its name carries it.
+    rolling: bool = False
 
 
 WINDOWS: tuple[EarlyWindowDescription, ...] = (
@@ -121,7 +128,10 @@ WINDOWS: tuple[EarlyWindowDescription, ...] = (
         key="month", bucket=2, completed=lambda data: data.completed_month
     ),
     EarlyWindowDescription(
-        key="rolling", bucket=3, completed=lambda data: data.completed_rolling
+        key="rolling",
+        bucket=3,
+        completed=lambda data: data.completed_rolling,
+        rolling=True,
     ),
 )
 
@@ -244,11 +254,16 @@ class EarlyWindowSensor(EarlyEntity, SensorEntity):
         """Initialise the sensor."""
         super().__init__(coordinator, entry, key)
         self.entity_description = description
+        if description.rolling:
+            self._attr_translation_placeholders = {
+                "days": str(rolling_days(entry.options))
+            }
 
     @property
     def _window_start(self) -> datetime:
         """Return the local start of this sensor's window."""
-        return bucket_starts(dt_util.utcnow())[self.entity_description.bucket]
+        windows = bucket_starts(dt_util.utcnow(), rolling_days(self._entry.options))
+        return windows[self.entity_description.bucket]
 
     @property
     def tracked_hours(self) -> float:

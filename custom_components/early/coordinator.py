@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
@@ -16,9 +17,10 @@ from homeassistant.util import dt as dt_util
 from .api import EarlyApi, EarlyAuthError, EarlyError, parse_timestamp
 from .const import (
     ACTIVITY_INTERVAL,
+    CONF_ROLLING_DAYS,
+    DEFAULT_ROLLING_DAYS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
-    ROLLING_DAYS,
     TIME_ENTRY_INTERVAL,
 )
 
@@ -82,17 +84,28 @@ def overlap_seconds(
     return max((last - first).total_seconds(), 0.0)
 
 
-def bucket_starts(now: datetime) -> tuple[datetime, datetime, datetime, datetime]:
+def rolling_days(options: Mapping[str, Any]) -> int:
+    """Return the configured length of the rolling window, in days."""
+    try:
+        days = int(float(options.get(CONF_ROLLING_DAYS, DEFAULT_ROLLING_DAYS)))
+    except (TypeError, ValueError):
+        return DEFAULT_ROLLING_DAYS
+    return max(days, 1)
+
+
+def bucket_starts(
+    now: datetime, days: int = DEFAULT_ROLLING_DAYS
+) -> tuple[datetime, datetime, datetime, datetime]:
     """Return the local start of today, the week, the month and the rolling window.
 
-    The rolling window ends with today, so it spans ROLLING_DAYS days including
-    today rather than ROLLING_DAYS days before it.
+    The rolling window ends with today, so it spans `days` days including today
+    rather than `days` days before it.
     """
     local_now = dt_util.as_local(now)
     day = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
     week = day - timedelta(days=day.weekday())
     month = day.replace(day=1)
-    rolling = day - timedelta(days=ROLLING_DAYS - 1)
+    rolling = day - timedelta(days=days - 1)
     return day, week, month, rolling
 
 
@@ -188,7 +201,7 @@ class EarlyDataUpdateCoordinator(DataUpdateCoordinator[EarlyData]):
         One request covers all of them: it spans the earliest window start, and
         each entry is then counted against every window it falls into.
         """
-        windows = bucket_starts(now)
+        windows = bucket_starts(now, rolling_days(self.config_entry.options))
         entries = await self.api.async_get_time_entries(min(windows), now)
 
         totals = [0.0] * len(windows)

@@ -23,8 +23,12 @@ WEEKDAYS: Final = (
 )
 DEFAULT_WORKDAY_HOURS: Final = (8.0, 8.0, 8.0, 8.0, 8.0, 0.0, 0.0)
 
-# Length of the rolling window, ending with today.
-ROLLING_DAYS: Final = 30
+# Length of the rolling window, ending with today. Four weeks by default:
+# a whole number of weeks always holds the same weekdays, so the target stays
+# put as the window slides, where 30 days would step by a day's worth whenever
+# the count of weekdays inside it changes.
+CONF_ROLLING_DAYS: Final = "rolling_days"
+DEFAULT_ROLLING_DAYS: Final = 28
 
 API_BASE_URL: Final = "https://api.early.app/api/v4"
 

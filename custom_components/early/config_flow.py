@@ -23,7 +23,14 @@ from homeassistant.helpers.selector import (
 )
 
 from .api import EarlyApi, EarlyAuthError, EarlyConnectionError, EarlyError
-from .const import CONF_API_SECRET, DEFAULT_WORKDAY_HOURS, DOMAIN, WEEKDAYS
+from .const import (
+    CONF_API_SECRET,
+    CONF_ROLLING_DAYS,
+    DEFAULT_ROLLING_DAYS,
+    DEFAULT_WORKDAY_HOURS,
+    DOMAIN,
+    WEEKDAYS,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +45,11 @@ DESCRIPTION_PLACEHOLDERS = {"url": "https://product.early.app"}
 HOUR_SELECTOR = NumberSelector(
     NumberSelectorConfig(
         min=0, max=24, step=0.25, mode=NumberSelectorMode.BOX, unit_of_measurement="h"
+    )
+)
+DAYS_SELECTOR = NumberSelector(
+    NumberSelectorConfig(
+        min=1, max=366, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="d"
     )
 )
 
@@ -150,10 +162,18 @@ class EarlyOptionsFlow(OptionsFlow):
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(day, default=options.get(day, fallback)): HOUR_SELECTOR
-                    for day, fallback in zip(
-                        WEEKDAYS, DEFAULT_WORKDAY_HOURS, strict=True
-                    )
+                    **{
+                        vol.Required(
+                            day, default=options.get(day, fallback)
+                        ): HOUR_SELECTOR
+                        for day, fallback in zip(
+                            WEEKDAYS, DEFAULT_WORKDAY_HOURS, strict=True
+                        )
+                    },
+                    vol.Required(
+                        CONF_ROLLING_DAYS,
+                        default=options.get(CONF_ROLLING_DAYS, DEFAULT_ROLLING_DAYS),
+                    ): DAYS_SELECTOR,
                 }
             ),
         )

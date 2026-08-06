@@ -148,8 +148,8 @@ async def test_rolling_window_spans_thirty_days_ending_today(
 ) -> None:
     """The rolling sensors reach back past the start of the calendar month."""
     # 1 h today + 0.5 h running + 2 h on Saturday + 3 h on 20 July. The May
-    # entry is older than 30 days and must not count.
-    assert hass.states.get("sensor.me_example_com_tracked_last_30_days").state == "6.5"
+    # entry is older than the window and must not count.
+    assert hass.states.get("sensor.me_example_com_tracked_last_28_days").state == "6.5"
 
     # One request serves every window, and it has to reach back far enough.
     ranges = [
@@ -158,19 +158,58 @@ async def test_rolling_window_spans_thirty_days_ending_today(
         if "/time-entries/" in str(call[1])
     ]
     assert ranges, "no time entry request was sent"
-    assert "2026-07-05T00:00:00.000" in ranges[-1]
+    assert "2026-07-07T00:00:00.000" in ranges[-1]
 
 
 async def test_rolling_balance_uses_the_same_target_rules(
     hass: HomeAssistant, entry: MockConfigEntry
 ) -> None:
     """The rolling balance counts weekday targets over its own window."""
-    balance = hass.states.get("sensor.me_example_com_balance_last_30_days")
+    balance = hass.states.get("sensor.me_example_com_balance_last_28_days")
     assert balance is not None
-    # 5 July to 3 August inclusive holds 21 weekdays at the default 8 hours.
-    assert balance.attributes["target_hours"] == pytest.approx(21 * 8.0)
+    # 7 July to 3 August is four whole weeks, so exactly 20 weekdays at the
+    # default 8 hours -- four times the 40 hour week, whatever day it starts on.
+    assert balance.attributes["target_hours"] == pytest.approx(160.0)
     assert balance.attributes["tracked_hours"] == pytest.approx(6.5)
-    assert float(balance.state) == pytest.approx(6.5 - 21 * 8.0)
+    assert float(balance.state) == pytest.approx(6.5 - 160.0)
+
+
+async def test_rolling_window_length_is_configurable(
+    hass: HomeAssistant, mock_early: AiohttpClientMocker, freezer
+) -> None:
+    """A shorter window changes the sensor name, the target and the reach back."""
+    freezer.move_to(NOW)
+    await hass.config.async_set_time_zone("UTC")
+
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="42",
+        title="me@example.com",
+        data={CONF_API_KEY: "key", CONF_API_SECRET: "secret"},
+        options={"rolling_days": 14},
+    )
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    # The configured length appears in the entity name, hence the entity id.
+    tracked = hass.states.get("sensor.me_example_com_tracked_last_14_days")
+    assert tracked is not None
+    assert tracked.attributes["friendly_name"] == "me@example.com Tracked last 14 days"
+
+    # 21 July to 3 August: the 20 July entry now falls outside the window.
+    assert tracked.state == "3.5"
+
+    balance = hass.states.get("sensor.me_example_com_balance_last_14_days")
+    assert balance.attributes["target_hours"] == pytest.approx(10 * 8.0)
+
+    # The single range request only reaches back as far as it has to.
+    ranges = [
+        str(call[1])
+        for call in mock_early.mock_calls
+        if "/time-entries/" in str(call[1])
+    ]
+    assert "2026-07-21T00:00:00.000" in ranges[-1]
 
 
 async def test_history_is_not_refetched_on_every_poll(
@@ -294,6 +333,7 @@ async def test_options_flow_stores_the_hours(
         "friday": 4,
         "saturday": 0,
         "sunday": 0,
+        "rolling_days": 28,
     }
     result = await hass.config_entries.options.async_configure(result["flow_id"], hours)
     await hass.async_block_till_done()
