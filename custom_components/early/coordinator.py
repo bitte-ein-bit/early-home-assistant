@@ -18,6 +18,7 @@ from .const import (
     ACTIVITY_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    ROLLING_DAYS,
     TIME_ENTRY_INTERVAL,
 )
 
@@ -54,6 +55,7 @@ class EarlyData:
     completed_today: float = 0.0
     completed_week: float = 0.0
     completed_month: float = 0.0
+    completed_rolling: float = 0.0
 
     @property
     def tracked_activity_id(self) -> str | None:
@@ -80,13 +82,18 @@ def overlap_seconds(
     return max((last - first).total_seconds(), 0.0)
 
 
-def bucket_starts(now: datetime) -> tuple[datetime, datetime, datetime]:
-    """Return the local start of today, of the week and of the month."""
+def bucket_starts(now: datetime) -> tuple[datetime, datetime, datetime, datetime]:
+    """Return the local start of today, the week, the month and the rolling window.
+
+    The rolling window ends with today, so it spans ROLLING_DAYS days including
+    today rather than ROLLING_DAYS days before it.
+    """
     local_now = dt_util.as_local(now)
     day = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
     week = day - timedelta(days=day.weekday())
     month = day.replace(day=1)
-    return day, week, month
+    rolling = day - timedelta(days=ROLLING_DAYS - 1)
+    return day, week, month, rolling
 
 
 class EarlyDataUpdateCoordinator(DataUpdateCoordinator[EarlyData]):
@@ -145,6 +152,7 @@ class EarlyDataUpdateCoordinator(DataUpdateCoordinator[EarlyData]):
                 completed_today=previous.completed_today,
                 completed_week=previous.completed_week,
                 completed_month=previous.completed_month,
+                completed_rolling=previous.completed_rolling,
             )
 
             if self._totals_need_refresh(data, now):
@@ -175,18 +183,27 @@ class EarlyDataUpdateCoordinator(DataUpdateCoordinator[EarlyData]):
         return last is None or now - last >= interval
 
     async def _async_update_totals(self, data: EarlyData, now: datetime) -> None:
-        """Sum the completed time entries into the day/week/month buckets."""
-        day, week, month = bucket_starts(now)
-        entries = await self.api.async_get_time_entries(min(week, month), now)
+        """Sum the completed time entries into every window.
 
-        totals = [0.0, 0.0, 0.0]
+        One request covers all of them: it spans the earliest window start, and
+        each entry is then counted against every window it falls into.
+        """
+        windows = bucket_starts(now)
+        entries = await self.api.async_get_time_entries(min(windows), now)
+
+        totals = [0.0] * len(windows)
         for entry in entries:
             duration = entry.get("duration") or {}
             start = parse_timestamp(duration.get("startedAt"))
             end = parse_timestamp(duration.get("stoppedAt"))
             if start is None or end is None:
                 continue
-            for index, window_start in enumerate((day, week, month)):
+            for index, window_start in enumerate(windows):
                 totals[index] += overlap_seconds(start, end, window_start, now)
 
-        data.completed_today, data.completed_week, data.completed_month = totals
+        (
+            data.completed_today,
+            data.completed_week,
+            data.completed_month,
+            data.completed_rolling,
+        ) = totals

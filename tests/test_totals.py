@@ -60,17 +60,19 @@ def test_bucket_starts_are_local_midnight() -> None:
     dt_util.set_default_time_zone(ZoneInfo("Europe/Berlin"))
     try:
         # 2026-08-03 is a Monday, so day and week start together.
-        day, week, month = bucket_starts(utc(2026, 8, 3, 5, 30))
+        day, week, month, rolling = bucket_starts(utc(2026, 8, 3, 5, 30))
         assert day.isoformat() == "2026-08-03T00:00:00+02:00"
         assert week == day
         assert month.isoformat() == "2026-08-01T00:00:00+02:00"
+        # 30 days ending with today, so 29 days back.
+        assert rolling.isoformat() == "2026-07-05T00:00:00+02:00"
 
         # 00:30 UTC on the 4th is already 02:30 local on the 4th.
-        day, _, _ = bucket_starts(utc(2026, 8, 4, 0, 30))
+        day, _, _, _ = bucket_starts(utc(2026, 8, 4, 0, 30))
         assert day.isoformat() == "2026-08-04T00:00:00+02:00"
 
         # 23:30 UTC on the 4th is 01:30 local on the 5th.
-        day, week, _ = bucket_starts(utc(2026, 8, 4, 23, 30))
+        day, week, _, _ = bucket_starts(utc(2026, 8, 4, 23, 30))
         assert day.isoformat() == "2026-08-05T00:00:00+02:00"
         assert week.isoformat() == "2026-08-03T00:00:00+02:00"
     finally:

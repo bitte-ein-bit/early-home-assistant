@@ -95,6 +95,12 @@
       },
       "balance_month": {
         "name": "Saldo diesen Monat"
+      },
+      "tracked_rolling": {
+        "name": "Letzte 30 Tage erfasst"
+      },
+      "balance_rolling": {
+        "name": "Saldo letzte 30 Tage"
       }
     }
   },

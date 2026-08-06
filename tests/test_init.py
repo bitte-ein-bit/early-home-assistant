@@ -54,6 +54,24 @@ TIME_ENTRIES = {
                 "stoppedAt": "2026-08-01T10:00:00.000",
             },
         },
+        # Three hours in July: inside the rolling 30 days, outside the month.
+        {
+            "id": "3",
+            "activity": ACTIVITIES["activities"][0],
+            "duration": {
+                "startedAt": "2026-07-20T08:00:00.000",
+                "stoppedAt": "2026-07-20T11:00:00.000",
+            },
+        },
+        # Four hours long before the rolling window opened: counted nowhere.
+        {
+            "id": "4",
+            "activity": ACTIVITIES["activities"][0],
+            "duration": {
+                "startedAt": "2026-05-04T08:00:00.000",
+                "stoppedAt": "2026-05-04T12:00:00.000",
+            },
+        },
     ]
 }
 
@@ -123,6 +141,100 @@ async def test_totals_include_the_running_tracking(
     assert hass.states.get("sensor.me_example_com_tracked_this_week").state == "1.5"
     # ... but inside the calendar month.
     assert hass.states.get("sensor.me_example_com_tracked_this_month").state == "3.5"
+
+
+async def test_rolling_window_spans_thirty_days_ending_today(
+    hass: HomeAssistant, entry: MockConfigEntry, mock_early: AiohttpClientMocker
+) -> None:
+    """The rolling sensors reach back past the start of the calendar month."""
+    # 1 h today + 0.5 h running + 2 h on Saturday + 3 h on 20 July. The May
+    # entry is older than 30 days and must not count.
+    assert hass.states.get("sensor.me_example_com_tracked_last_30_days").state == "6.5"
+
+    # One request serves every window, and it has to reach back far enough.
+    ranges = [
+        str(call[1])
+        for call in mock_early.mock_calls
+        if "/time-entries/" in str(call[1])
+    ]
+    assert ranges, "no time entry request was sent"
+    assert "2026-07-05T00:00:00.000" in ranges[-1]
+
+
+async def test_rolling_balance_uses_the_same_target_rules(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """The rolling balance counts weekday targets over its own window."""
+    balance = hass.states.get("sensor.me_example_com_balance_last_30_days")
+    assert balance is not None
+    # 5 July to 3 August inclusive holds 21 weekdays at the default 8 hours.
+    assert balance.attributes["target_hours"] == pytest.approx(21 * 8.0)
+    assert balance.attributes["tracked_hours"] == pytest.approx(6.5)
+    assert float(balance.state) == pytest.approx(6.5 - 21 * 8.0)
+
+
+async def test_history_is_not_refetched_on_every_poll(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    mock_early: AiohttpClientMocker,
+    freezer,
+) -> None:
+    """The heavy range query runs on a slow cadence, not with every tracking poll."""
+
+    def counts() -> tuple[int, int]:
+        entries = len(
+            [c for c in mock_early.mock_calls if "/time-entries/" in str(c[1])]
+        )
+        tracking = len(
+            [
+                c
+                for c in mock_early.mock_calls
+                if c[0].lower() == "get" and str(c[1]).endswith("/tracking")
+            ]
+        )
+        return entries, tracking
+
+    entries_before, tracking_before = counts()
+
+    # Ten minutes of polling with nothing happening.
+    for minute in range(1, 11):
+        freezer.move_to(f"2026-08-03T10:{minute:02d}:00+00:00")
+        await entry.runtime_data.coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    entries_after, tracking_after = counts()
+    assert tracking_after > tracking_before, "the tracking poll stopped running"
+    assert entries_after == entries_before, "history was refetched while idle"
+
+
+async def test_history_is_refetched_when_the_activity_changes(
+    hass: HomeAssistant, entry: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """A stop or an activity switch creates a time entry, so history reloads."""
+
+    def entry_requests() -> int:
+        return len(
+            [c for c in aioclient_mock.mock_calls if "/time-entries/" in str(c[1])]
+        )
+
+    # The tracking switched to the other activity behind our back.
+    # clear_requests() also wipes the call log, so count from after it.
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(
+        f"{API_BASE_URL}/tracking",
+        json={**TRACKING, "activity": ACTIVITIES["activities"][1]},
+    )
+    aioclient_mock.get(f"{API_BASE_URL}/activities", json=ACTIVITIES)
+    aioclient_mock.get(
+        re.compile(rf"{re.escape(API_BASE_URL)}/time-entries/.*"), json=TIME_ENTRIES
+    )
+
+    assert entry_requests() == 0
+
+    await entry.runtime_data.coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert entry_requests() == 1
 
 
 async def test_balance_compares_tracked_time_against_the_target(

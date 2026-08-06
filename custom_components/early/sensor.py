@@ -120,6 +120,9 @@ WINDOWS: tuple[EarlyWindowDescription, ...] = (
     EarlyWindowDescription(
         key="month", bucket=2, completed=lambda data: data.completed_month
     ),
+    EarlyWindowDescription(
+        key="rolling", bucket=3, completed=lambda data: data.completed_rolling
+    ),
 )
 
 

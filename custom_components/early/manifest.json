@@ -1,12 +1,14 @@
 {
   "domain": "early",
   "name": "EARLY (Timeular)",
-  "codeowners": ["@bitte-ein-bit"],
+  "codeowners": [
+    "@bitte-ein-bit"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/bitte-ein-bit/early-home-assistant",
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/bitte-ein-bit/early-home-assistant/issues",
   "requirements": [],
-  "version": "0.3.0"
+  "version": "0.4.0"
 }

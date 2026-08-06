@@ -95,6 +95,12 @@
       },
       "balance_month": {
         "name": "Balance this month"
+      },
+      "tracked_rolling": {
+        "name": "Tracked last 30 days"
+      },
+      "balance_rolling": {
+        "name": "Balance last 30 days"
       }
     }
   },

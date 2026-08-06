@@ -23,13 +23,18 @@ WEEKDAYS: Final = (
 )
 DEFAULT_WORKDAY_HOURS: Final = (8.0, 8.0, 8.0, 8.0, 8.0, 0.0, 0.0)
 
+# Length of the rolling window, ending with today.
+ROLLING_DAYS: Final = 30
+
 API_BASE_URL: Final = "https://api.early.app/api/v4"
 
 # How often the current tracking is polled. Everything else is derived from it.
 DEFAULT_SCAN_INTERVAL: Final = timedelta(seconds=30)
-# Completed time entries barely change while a tracking is running, so they are
-# fetched on a slower cadence and refreshed eagerly whenever a tracking stops.
-TIME_ENTRY_INTERVAL: Final = timedelta(minutes=5)
+# Completed time entries only change when a tracking stops, which the
+# coordinator already reacts to, so the periodic fetch is just a safety net for
+# edits made elsewhere. It is the heaviest call in the integration -- it returns
+# every entry in the window -- so it runs rarely.
+TIME_ENTRY_INTERVAL: Final = timedelta(hours=1)
 # The activity list is edited by hand in the EARLY app, so it changes rarely.
 ACTIVITY_INTERVAL: Final = timedelta(minutes=15)
 
