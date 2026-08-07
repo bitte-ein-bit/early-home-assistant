@@ -28,7 +28,7 @@ without anything being hardcoded.
 | `sensor.<account>_balance_today` | sensor (duration, h) | Tracked minus target hours. Negative means hours still owed, positive means overtime. Attributes: `tracked_hours`, `target_hours`, `remaining_hours` |
 | `sensor.<account>_balance_this_week` | sensor (duration, h) | Same from Monday up to and including today |
 | `sensor.<account>_balance_this_month` | sensor (duration, h) | Same from the 1st up to and including today |
-| `sensor.<account>_tracked_last_28_days` | sensor (duration, h) | Rolling window ending with today; length configurable, and it appears in the name |
+| `sensor.<account>_tracked_last_28_days` | sensor (duration, h) | Rolling window ending **now**, not at midnight; length configurable, and it appears in the name |
 | `sensor.<account>_balance_last_28_days` | sensor (duration, h) | Balance over that same rolling window |
 | `binary_sensor.<account>_tracking` | binary sensor | `on` while any tracking runs |
 | `select.<account>_activity` | select | Which activity the start button will track |
@@ -123,15 +123,26 @@ The **rolling window** pair is the one to watch for staying on target on
 average: unlike the calendar month it does not reset on the 1st, so a deficit or
 a pile of overtime stays visible until it is actually worked off.
 
-Its length is set under *Configure* and defaults to **28 days**. Four weeks is
-deliberate: a whole number of weeks always contains the same weekdays, so the
-target stays put as the window slides — 20 weekdays, exactly four times a 40
-hour week, whichever day it happens to start on. A 30 day window would hold 21
-or 22 weekdays depending on where it starts, and its target would step by eight
-hours as it moves, which is noise you would have to read past.
+It ends **now**, not at last midnight, and reaches back exactly 28 × 24 hours.
+That matters: a window snapped to midnight would drop a whole worked day out of
+the far end at 00:00 while the near end gained a day with nothing in it yet, so
+the balance fell off a cliff every night. Ending it at the current moment lets
+yesterday's hours leave gradually — an eight hour day worked 08:00–16:00 four
+weeks ago starts leaving the window at 08:00 today and is fully out by 16:00.
 
-Set it to whatever suits you; the length shows up in the sensor name, so a 14
-day window reads as `Tracked last 14 days`.
+The target does not move at all meanwhile. The two partial days at the ends of
+the window are the same weekday when the length is a whole number of weeks, and
+their shares add up to exactly one of them, so the target sits at a constant 20
+weekdays — four times a 40 hour week — no matter the time of day.
+
+Its length is set under *Configure* and defaults to **28 days** for that reason.
+A 30 day window holds 21 or 22 weekdays depending on where it starts, so its
+target drifts as it slides; it never jumps, but it is noise you would have to
+read past. Set it to whatever suits you; the length shows up in the sensor name,
+so a 14 day window reads as `Tracked last 14 days`.
+
+The day, week and month balances are calendar things by definition and do still
+step at their boundaries — `balance_today` drops to minus a full day at 00:00.
 
 #### Time off
 
@@ -177,7 +188,9 @@ tracked hours. If you want the two separated, open an issue.
   every 15 minutes, so the select follows edits made in the app.
 - One time entry request feeds all four windows at once: it spans the earliest
   window start, and each entry is then counted against every window it falls in.
-  Shortening the rolling window therefore also shortens what has to be fetched.
+  Because the rolling window ends at the current moment, that start sits one
+  part-day further back than the window length — a 28 day window fetches 29
+  calendar days. Shortening the window shortens what has to be fetched.
 - The daily, weekly and monthly totals add the running tracking's elapsed time on
   top of the completed entries, clipped at the window boundary — a tracking that
   crosses midnight only counts its part of each day.

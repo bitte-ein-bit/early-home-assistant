@@ -41,7 +41,7 @@ from .coordinator import (
     rolling_days,
 )
 from .entity import EarlyEntity
-from .targets import target_between
+from .targets import rolling_target, target_between
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -277,15 +277,16 @@ class EarlyWindowSensor(EarlyEntity, SensorEntity):
 
     @property
     def target_hours(self) -> float:
-        """Return the hours meant to be tracked from the window start to today."""
-        return round(
-            target_between(
-                self._entry.options,
-                self._window_start.date(),
-                dt_util.as_local(dt_util.utcnow()).date(),
-            ),
-            3,
-        )
+        """Return the hours meant to be tracked over this sensor's window."""
+        options = self._entry.options
+        local_now = dt_util.as_local(dt_util.utcnow())
+        if self.entity_description.rolling:
+            target = rolling_target(options, local_now, rolling_days(options))
+        else:
+            target = target_between(
+                options, self._window_start.date(), local_now.date()
+            )
+        return round(target, 3)
 
 
 class EarlyTotalSensor(EarlyWindowSensor):

@@ -120,16 +120,17 @@ def rolling_days(options: Mapping[str, Any]) -> int:
 def bucket_starts(
     now: datetime, days: int = DEFAULT_ROLLING_DAYS
 ) -> tuple[datetime, datetime, datetime, datetime]:
-    """Return the local start of today, the week, the month and the rolling window.
+    """Return the start of today, the week, the month and the rolling window.
 
-    The rolling window ends with today, so it spans `days` days including today
-    rather than `days` days before it.
+    The first three are anchored to local midnight. The rolling one is not: it
+    ends at `now` and reaches back exactly `days` × 24 h, so its contents leak
+    out minute by minute instead of a whole day falling out at midnight.
     """
     local_now = dt_util.as_local(now)
     day = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
     week = day - timedelta(days=day.weekday())
     month = day.replace(day=1)
-    rolling = day - timedelta(days=days - 1)
+    rolling = local_now - timedelta(days=days)
     return day, week, month, rolling
 
 
